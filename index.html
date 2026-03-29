@@ -1,0 +1,635 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+// --- 幾何與目標定義區 ---
+const TARGET_CX = 250;
+const TARGET_CY = 275;
+const SNAP_RADIUS = 75; 
+
+// 精準匹配您圖片中的七塊形狀與位置
+const baseTargets = [
+  { id: 'LT1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], x: TARGET_CX - 120, y: TARGET_CY, rot: 270, flipX: 1 }, 
+  { id: 'LT2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], x: TARGET_CX, y: TARGET_CY - 120, rot: 0, flipX: 1 }, 
+  { id: 'MT',  type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], x: TARGET_CX + 120, y: TARGET_CY + 120, rot: 0, flipX: 1 }, 
+  { id: 'SQ',  type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], x: TARGET_CX, y: TARGET_CY + 60, rot: 0, flipX: 1 }, 
+  { id: 'ST1', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], x: TARGET_CX - 60, y: TARGET_CY + 120, rot: 0, flipX: 1 }, 
+  { id: 'ST2', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], x: TARGET_CX + 60, y: TARGET_CY, rot: 270, flipX: 1 }, 
+  { id: 'PA',  type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], x: TARGET_CX + 90, y: TARGET_CY - 30, rot: 270, flipX: -1 } 
+];
+
+const allSlots = [];
+for (let flip of [1, -1]) {
+  for (let angle of [0, 90, 180, 270]) {
+    for (let bt of baseTargets) {
+      let nx = bt.x - TARGET_CX;
+      let ny = bt.y - TARGET_CY;
+      if (flip === -1) nx = -nx;
+      let rad = (angle * Math.PI) / 180;
+      let rx = nx * Math.cos(rad) - ny * Math.sin(rad);
+      let ry = nx * Math.sin(rad) + ny * Math.cos(rad);
+      let effectiveRot = flip === -1 ? -bt.rot : bt.rot;
+      allSlots.push({
+        type: bt.type,
+        x: TARGET_CX + rx,
+        y: TARGET_CY + ry,
+        rot: (effectiveRot + angle + 360) % 360,
+        flipX: bt.flipX * flip,
+        localPoints: bt.localPoints
+      });
+    }
+  }
+}
+
+function getGlobalVertices(p) {
+  let rad = (p.rot * Math.PI) / 180;
+  let cos = Math.cos(rad);
+  let sin = Math.sin(rad);
+  return p.localPoints.map((pt) => {
+    let x = pt[0] * p.flipX;
+    let y = pt[1];
+    let rx = x * cos - y * sin;
+    let ry = x * sin + y * cos;
+    return [p.x + rx, p.y + ry];
+  });
+}
+
+function polygonsMatch(polyA, polyB) {
+  if (polyA.length !== polyB.length) return false;
+  for (let a of polyA) {
+    let matched = false;
+    for (let b of polyB) {
+      if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 5) {
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) return false;
+  }
+  return true;
+}
+
+// 建立動態佈局生成器，根據是否為手機螢幕來配置不同的物理座標與畫布比例
+const getLayoutConfig = (isMobile) => {
+  const TARGET_CX = isMobile ? 300 : 250;
+  const TARGET_CY = isMobile ? 220 : 275;
+  const SNAP_RADIUS = 75;
+
+  const baseTargets = [
+    { id: 'LT1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], x: TARGET_CX - 120, y: TARGET_CY, rot: 270, flipX: 1 }, 
+    { id: 'LT2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], x: TARGET_CX, y: TARGET_CY - 120, rot: 0, flipX: 1 }, 
+    { id: 'MT',  type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], x: TARGET_CX + 120, y: TARGET_CY + 120, rot: 0, flipX: 1 }, 
+    { id: 'SQ',  type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], x: TARGET_CX, y: TARGET_CY + 60, rot: 0, flipX: 1 }, 
+    { id: 'ST1', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], x: TARGET_CX - 60, y: TARGET_CY + 120, rot: 0, flipX: 1 }, 
+    { id: 'ST2', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], x: TARGET_CX + 60, y: TARGET_CY, rot: 270, flipX: 1 }, 
+    { id: 'PA',  type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], x: TARGET_CX + 90, y: TARGET_CY - 30, rot: 270, flipX: -1 } 
+  ];
+
+  const allSlots = [];
+  for (let flip of [1, -1]) {
+    for (let angle of [0, 90, 180, 270]) {
+      for (let bt of baseTargets) {
+        let nx = bt.x - TARGET_CX;
+        let ny = bt.y - TARGET_CY;
+        if (flip === -1) nx = -nx;
+        let rad = (angle * Math.PI) / 180;
+        let rx = nx * Math.cos(rad) - ny * Math.sin(rad);
+        let ry = nx * Math.sin(rad) + ny * Math.cos(rad);
+        let effectiveRot = flip === -1 ? -bt.rot : bt.rot;
+        allSlots.push({
+          type: bt.type,
+          x: TARGET_CX + rx,
+          y: TARGET_CY + ry,
+          rot: (effectiveRot + angle + 360) % 360,
+          flipX: bt.flipX * flip,
+          localPoints: bt.localPoints
+        });
+      }
+    }
+  }
+
+  // 手機版：散佈於畫布下半部 (y: 560 ~ 830)；桌機版：維持散佈於右半部
+  const initialPieces = isMobile ? [
+    { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 180, y: 560, rot: 45, flipX: 1, isSnapped: false },
+    { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 420, y: 560, rot: -45, flipX: 1, isSnapped: false },
+    { id: '3', type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], color: '#F9B42A', x: 300, y: 700, rot: 90, flipX: 1, isSnapped: false },
+    { id: '4', type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], color: '#A592C4', x: 150, y: 750, rot: 0, flipX: 1, isSnapped: false },
+    { id: '5', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F38AB8', x: 450, y: 750, rot: 135, flipX: 1, isSnapped: false },
+    { id: '6', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F6E927', x: 250, y: 830, rot: 225, flipX: 1, isSnapped: false },
+    { id: '7', type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], color: '#EB3A52', x: 400, y: 830, rot: 0, flipX: 1, isSnapped: false }
+  ] : [
+    { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 550, y: 150, rot: 45, flipX: 1, isSnapped: false },
+    { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 750, y: 150, rot: -45, flipX: 1, isSnapped: false },
+    { id: '3', type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], color: '#F9B42A', x: 600, y: 320, rot: 90, flipX: 1, isSnapped: false },
+    { id: '4', type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], color: '#A592C4', x: 750, y: 320, rot: 0, flipX: 1, isSnapped: false },
+    { id: '5', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F38AB8', x: 520, y: 440, rot: 135, flipX: 1, isSnapped: false },
+    { id: '6', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F6E927', x: 650, y: 440, rot: 225, flipX: 1, isSnapped: false },
+    { id: '7', type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], color: '#EB3A52', x: 800, y: 440, rot: 0, flipX: 1, isSnapped: false }
+  ];
+
+  return { TARGET_CX, TARGET_CY, SNAP_RADIUS, allSlots, initialPieces, viewBox: isMobile ? "0 0 600 900" : "0 0 900 550", isMobile };
+};
+
+// --- 物理碰撞系統 (Separating Axis Theorem) ---
+const getAxes = (poly) => {
+  const axes = [];
+  for (let i = 0; i < poly.length; i++) {
+    const p1 = poly[i];
+    const p2 = poly[(i + 1) % poly.length];
+    // 取得垂直法向量
+    const normal = [p1[1] - p2[1], p2[0] - p1[0]];
+    const len = Math.hypot(normal[0], normal[1]);
+    if (len > 0) axes.push([normal[0] / len, normal[1] / len]);
+  }
+  return axes;
+};
+
+const project = (poly, axis) => {
+  let min = Infinity, max = -Infinity;
+  for (const p of poly) {
+    const dot = p[0] * axis[0] + p[1] * axis[1];
+    if (dot < min) min = dot;
+    if (dot > max) max = dot;
+  }
+  return [min, max];
+};
+
+// 檢查兩個多邊形是否實體重疊
+const checkOverlap = (poly1, poly2) => {
+  const axes = [...getAxes(poly1), ...getAxes(poly2)];
+  for (const axis of axes) {
+    const [min1, max1] = project(poly1, axis);
+    const [min2, max2] = project(poly2, axis);
+    // 容忍度設為 2px，允許積木邊緣「完美貼合」而不觸發互斥碰撞
+    if (max1 <= min2 + 2 || max2 <= min1 + 2) return false;
+  }
+  return true;
+};
+
+const initialPieces = [
+  { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 550, y: 150, rot: 45, flipX: 1, isSnapped: false },
+  { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 750, y: 150, rot: -45, flipX: 1, isSnapped: false },
+  { id: '3', type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], color: '#F9B42A', x: 600, y: 320, rot: 90, flipX: 1, isSnapped: false },
+  { id: '4', type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], color: '#A592C4', x: 750, y: 320, rot: 0, flipX: 1, isSnapped: false },
+  { id: '5', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F38AB8', x: 520, y: 440, rot: 135, flipX: 1, isSnapped: false },
+  { id: '6', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F6E927', x: 650, y: 440, rot: 225, flipX: 1, isSnapped: false },
+  { id: '7', type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], color: '#EB3A52', x: 800, y: 440, rot: 0, flipX: 1, isSnapped: false }
+];
+
+const playVictoryChord = () => {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+  const ctx = new AudioContext();
+  const playNote = (freq, startTime, duration) => {
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    osc.type = 'triangle'; 
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gainNode.gain.setValueAtTime(0, startTime);
+    gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.05);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  };
+  const now = ctx.currentTime;
+  playNote(261.63, now, 1);       
+  playNote(329.63, now + 0.1, 1); 
+  playNote(392.00, now + 0.2, 1); 
+  playNote(523.25, now + 0.3, 1.5); 
+};
+
+// 產生當前拼圖的唯一簽名，用於比對是否為重複的解答
+const getSnapshotSignature = (pieces) => {
+  return pieces.map(p => `${p.id}:${Math.round(p.x)}:${Math.round(p.y)}:${p.rot}:${p.flipX}`).sort().join('|');
+};
+
+export default function TangramGame() {
+  const [isMobile, setIsMobile] = useState(false);
+  const [config, setConfig] = useState(() => getLayoutConfig(false));
+  const [pieces, setPieces] = useState(config.initialPieces);
+  const [selectedId, setSelectedId] = useState(null);
+  const [isWin, setIsWin] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const svgRef = useRef(null);
+  const dragInfo = useRef({ isDragging: false, id: null, offsetX: 0, offsetY: 0 });
+
+  // 監聽螢幕寬度變化，動態切換佈局
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      if (mobile !== isMobile) {
+        setIsMobile(mobile);
+        const newConfig = getLayoutConfig(mobile);
+        setConfig(newConfig);
+        // 切換版型時重置積木位置，避免超出畫布邊界
+        setPieces(JSON.parse(JSON.stringify(newConfig.initialPieces)));
+        setIsWin(false);
+      }
+    };
+    checkMobile(); // 初次載入時偵測
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [isMobile]);
+
+  useEffect(() => {
+    const checkWin = pieces.every((p) => p.isSnapped);
+    if (checkWin && !isWin) {
+      setIsWin(true);
+      playVictoryChord(); 
+      
+      // 保存到圖鑑邏輯
+      const sig = getSnapshotSignature(pieces);
+      setHistory(prev => {
+        // 確保不存入完全一模一樣的排版
+        if (!prev.some(h => h.sig === sig)) {
+          return [...prev, { sig, pieces: JSON.parse(JSON.stringify(pieces)) }];
+        }
+        return prev;
+      });
+
+    } else if (!checkWin && isWin) {
+      setIsWin(false);
+    }
+  }, [pieces, isWin]);
+
+  const handleReset = () => {
+    setPieces(JSON.parse(JSON.stringify(initialPieces))); // 深度拷貝避免參照污染
+    setSelectedId(null);
+    setIsWin(false);
+  };
+
+  const getPointerPos = (e) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+    pt.y = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+    return pt.matrixTransform(svg.getScreenCTM().inverse());
+  };
+
+  const handlePointerDown = (e, id) => {
+    if (isWin) return; // 贏了之後鎖定拖曳，直到重置
+    e.stopPropagation();
+    e.target.setPointerCapture(e.pointerId);
+    setSelectedId(id);
+
+    const pos = getPointerPos(e);
+    const piece = pieces.find((p) => p.id === id);
+    if (!piece) return;
+
+    dragInfo.current = {
+      isDragging: true,
+      id: id,
+      offsetX: piece.x - pos.x,
+      offsetY: piece.y - pos.y
+    };
+
+    setPieces((prev) => {
+      const filtered = prev.filter((p) => p.id !== id);
+      return [...filtered, { ...piece, isSnapped: false }];
+    });
+  };
+
+  const handlePointerMove = (e) => {
+    if (!dragInfo.current.isDragging || !dragInfo.current.id) return;
+    const pos = getPointerPos(e);
+    setPieces((prev) =>
+      prev.map((p) =>
+        p.id === dragInfo.current.id
+          ? { ...p, x: pos.x + dragInfo.current.offsetX, y: pos.y + dragInfo.current.offsetY }
+          : p
+      )
+    );
+  };
+
+  const handlePointerUp = (e) => {
+    if (!dragInfo.current.isDragging) return;
+    const id = dragInfo.current.id;
+    dragInfo.current = { isDragging: false, id: null, offsetX: 0, offsetY: 0 };
+    triggerSnapCheck(id);
+  };
+
+  const triggerSnapCheck = (pieceId) => {
+    setPieces((prev) => {
+      const piece = prev.find((p) => p.id === pieceId);
+      if (!piece) return prev;
+
+      let bestSlot = null;
+      let minDistance = 45;
+
+      const validSlots = config.allSlots.filter((slot) => slot.type === piece.type);
+      const otherPieces = prev.filter((p) => p.id !== pieceId);
+      const otherPolygons = otherPieces.map((p) => getGlobalVertices(p));
+
+      // 1. 優先判定：是否完美符合最終勝利的解答槽位
+      for (let slot of validSlots) {
+        const dist = Math.hypot(piece.x - slot.x, piece.y - slot.y);
+        if (dist < 45) {
+          const tempPiece = { ...piece, x: slot.x, y: slot.y };
+          const pPoly = getGlobalVertices(tempPiece);
+          const slotPoly = getGlobalVertices(slot);
+
+          if (polygonsMatch(pPoly, slotPoly)) {
+            let isOccupied = false;
+            for (let op of otherPolygons) {
+              if (checkOverlap(slotPoly, op)) {
+                isOccupied = true;
+                break;
+              }
+            }
+            if (!isOccupied && dist < minDistance) {
+              minDistance = dist;
+              bestSlot = slot;
+            }
+          }
+        }
+      }
+
+      if (bestSlot) {
+        return prev.map((p) =>
+          p.id === pieceId ? { ...p, x: bestSlot.x, y: bestSlot.y, isSnapped: true } : p
+        );
+      } else {
+        // 2. 自由拼湊模式：導入 SAT 多邊形碰撞檢測與 30px 網格對齊
+        const distToCenter = Math.hypot(piece.x - config.TARGET_CX, piece.y - config.TARGET_CY);
+
+        if (distToCenter < 200) {
+          let gridX = Math.round((piece.x - config.TARGET_CX) / 30) * 30 + config.TARGET_CX;
+          let gridY = Math.round((piece.y - config.TARGET_CY) / 30) * 30 + config.TARGET_CY;
+
+          const tempPiece = { ...piece, x: gridX, y: gridY };
+          const pPoly = getGlobalVertices(tempPiece);
+
+          let hasCollision = false;
+          for (let op of otherPolygons) {
+            if (checkOverlap(pPoly, op)) {
+              hasCollision = true;
+              break;
+            }
+          }
+
+          if (hasCollision) {
+            let angle = Math.atan2(piece.y - config.TARGET_CY, piece.x - config.TARGET_CX);
+            if (distToCenter < 5) angle = Math.random() * Math.PI * 2;
+            const pushX = config.TARGET_CX + Math.cos(angle) * 220;
+            const pushY = config.TARGET_CY + Math.sin(angle) * 220;
+            return prev.map((p) =>
+              p.id === pieceId ? { ...p, x: pushX, y: pushY, isSnapped: false } : p
+            );
+          } else {
+            return prev.map((p) =>
+              p.id === pieceId ? { ...p, x: gridX, y: gridY, isSnapped: false } : p
+            );
+          }
+        }
+      }
+      return prev;
+    });
+  };
+
+  const applyAction = (action) => {
+    if (!selectedId || isWin) return;
+    setPieces((prev) => {
+      return prev.map((p) => {
+        if (p.id !== selectedId) return p;
+        let newRot = p.rot;
+        let newFlipX = p.flipX;
+        if (action === 'rotate-cw') newRot = (newRot + 45) % 360;
+        if (action === 'rotate-ccw') newRot = (newRot - 45 + 360) % 360;
+        if (action === 'flip' && p.type === 'PA') newFlipX = newFlipX === 1 ? -1 : 1;
+        return { ...p, rot: newRot, flipX: newFlipX, isSnapped: false };
+      });
+    });
+    setTimeout(() => triggerSnapCheck(selectedId), 50);
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-start h-[100dvh] bg-slate-50 font-sans select-none overflow-hidden touch-none relative">
+      
+      {/* 頂部輕量化狀態列 */}
+      <div className="w-full flex-none px-6 py-3 flex justify-between items-center bg-white shadow-sm border-b border-slate-200 z-10">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800 tracking-tight">數位七巧板</h1>
+          <p className="text-xs text-slate-500 hidden sm:block">挑戰用不同排版填滿正方形！</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {history.length > 0 && (
+            <button
+              onClick={() => setShowHistory(true)}
+              className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm font-bold transition-colors shadow-sm flex items-center gap-1"
+            >
+              <span>🖼️ 圖鑑</span>
+              <span className="bg-white text-blue-600 px-1.5 py-0.5 rounded-full text-xs">{history.length}</span>
+            </button>
+          )}
+          <button
+            onClick={handleReset}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 rounded-md text-sm font-bold transition-colors shadow-sm"
+          >
+            ↻ 淨空畫布
+          </button>
+        </div>
+      </div>
+
+      {/* 遊戲畫布區 */}
+      <div className="relative w-full flex-1 w-max-6xl flex justify-center items-center p-4">
+        
+        {/* 大型勝利慶典 Overlay */}
+        {isWin && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm transition-all animate-in fade-in duration-500">
+            <div className="bg-white/90 p-8 rounded-3xl shadow-2xl flex flex-col items-center border border-green-100 transform hover:scale-105 transition-transform">
+              <div className="text-7xl mb-4 animate-bounce">🎉</div>
+              <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-400 mb-6 drop-shadow-sm text-center">
+                挑戰成功！
+              </h2>
+              <p className="text-slate-500 mb-8 text-center font-medium">您已解鎖一種全新的拼法，已收錄至圖鑑中。</p>
+              <div className="flex gap-4 w-full">
+                <button
+                  onClick={handleReset}
+                  className="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors"
+                >
+                  再拼一次
+                </button>
+                <button
+                  onClick={() => setShowHistory(true)}
+                  className="flex-1 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-green-500/30"
+                >
+                  查看圖鑑
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <svg
+          ref={svgRef}
+          viewBox={config.viewBox}
+          className="w-full h-full max-h-full rounded-2xl bg-slate-100 shadow-inner"
+          preserveAspectRatio="xMidYMid meet"
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+        >
+          <defs>
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="2" dy="4" stdDeviation="4" floodOpacity="0.25" />
+            </filter>
+            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#3b82f6" floodOpacity="0.6" />
+            </filter>
+          </defs>
+
+          {/* 目標提示框 (動態適應位置) */}
+          <rect
+            x={config.TARGET_CX - 120}
+            y={config.TARGET_CY - 120}
+            width="240"
+            height="240"
+            fill="rgba(255,255,255,0.7)"
+            stroke="#cbd5e1"
+            strokeWidth="3"
+            strokeDasharray="10 10"
+            rx="6"
+          />
+          <text x={config.TARGET_CX} y={config.TARGET_CY - 140} textAnchor="middle" fill="#94a3b8" fontSize="18" fontWeight="bold">
+            目標區域
+          </text>
+
+          {/* 分隔線 (手機版為橫線，桌機版為直線) */}
+          <line 
+            x1={config.isMobile ? 0 : 450} 
+            y1={config.isMobile ? 420 : 40} 
+            x2={config.isMobile ? 600 : 450} 
+            y2={config.isMobile ? 420 : 510} 
+            stroke="#e2e8f0" strokeWidth="3" strokeDasharray="6 6" 
+          />
+
+          {/* 積木區標示 */}
+          <text 
+            x={config.isMobile ? 300 : 675} 
+            y={config.isMobile ? 455 : config.TARGET_CY - 140} 
+            textAnchor="middle" fill="#94a3b8" fontSize="18" fontWeight="bold"
+          >
+            積木區
+          </text>
+
+          {/* 繪製積木 */}
+          {pieces.map((p) => {
+            const isSelected = p.id === selectedId;
+            const isDragging = dragInfo.current.id === p.id;
+            const pointsStr = p.localPoints.map((pt) => pt.join(',')).join(' ');
+            return (
+              <polygon
+                key={p.id}
+                points={pointsStr}
+                fill={p.color}
+                stroke="white"
+                strokeWidth={isSelected ? 3 : 1.5}
+                strokeLinejoin="round"
+                transform={`translate(${p.x}, ${p.y}) rotate(${p.rot}) scale(${p.flipX}, 1)`}
+                filter={isSelected ? 'url(#glow)' : 'url(#shadow)'}
+                className="cursor-pointer"
+                style={{
+                  transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                }}
+                onPointerDown={(e) => handlePointerDown(e, p.id)}
+              />
+            );
+          })}
+        </svg>
+
+        {/* 控制面板 (手機版高度優化、字體與間距縮小以防跑版) */}
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex justify-center pointer-events-none z-10 w-full px-2 sm:px-0">
+          <div className="bg-white/95 backdrop-blur-md px-3 sm:px-5 py-2 sm:py-3 rounded-full shadow-lg border border-slate-200 pointer-events-auto flex gap-1 sm:gap-3 items-center whitespace-nowrap overflow-x-auto max-w-full">
+            <span className="text-slate-500 text-xs sm:text-sm font-medium mr-1 hidden sm:inline">控制：</span>
+            <button
+              onClick={() => applyAction('rotate-ccw')}
+              disabled={!selectedId || isWin}
+              className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40"
+            >
+              ↺ 逆轉
+            </button>
+            <button
+              onClick={() => applyAction('rotate-cw')}
+              disabled={!selectedId || isWin}
+              className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40"
+            >
+              ↻ 順轉
+            </button>
+            <div className="w-px h-5 sm:h-6 bg-slate-200 mx-0.5 sm:mx-1"></div>
+            <button
+              onClick={() => applyAction('flip')}
+              disabled={!selectedId || isWin || pieces.find((p) => p.id === selectedId)?.type !== 'PA'}
+              className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-pink-50 text-slate-700 hover:text-pink-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40"
+              title="僅平行四邊形可翻面"
+            >
+              ⇄ 翻面
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 圖鑑 Modal (覆蓋全螢幕但內部可捲動，不破壞主佈局) */}
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-8">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl h-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* 圖鑑 Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+                <span>🖼️</span> 成功圖鑑 <span className="text-sm font-bold text-slate-400 bg-slate-200 px-2 py-1 rounded-lg">共 {history.length} 種解法</span>
+              </h2>
+              <button 
+                onClick={() => setShowHistory(false)}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* 圖鑑 Content 網格 */}
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+              {history.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                  <div className="text-6xl mb-4 opacity-50">🧩</div>
+                  <p className="text-lg font-medium">尚未收錄任何解答，快去挑戰吧！</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {history.map((record, index) => (
+                    <div key={index} className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+                      <div className="aspect-square bg-slate-50 rounded-xl flex items-center justify-center overflow-hidden relative">
+                        {/* 迷你 SVG 畫布，視角鎖定在 Target 區域 (X:130~370, Y:155~395) */}
+                        <svg viewBox="110 135 280 280" className="w-full h-full transform group-hover:scale-105 transition-transform duration-300">
+                          {record.pieces.map((p) => {
+                            const pointsStr = p.localPoints.map((pt) => pt.join(',')).join(' ');
+                            return (
+                              <polygon
+                                key={p.id}
+                                points={pointsStr}
+                                fill={p.color}
+                                stroke="white"
+                                strokeWidth="2"
+                                strokeLinejoin="round"
+                                transform={`translate(${p.x}, ${p.y}) rotate(${p.rot}) scale(${p.flipX}, 1)`}
+                              />
+                            );
+                          })}
+                        </svg>
+                        <div className="absolute bottom-2 right-2 bg-white/80 backdrop-blur text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                          #{index + 1}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
