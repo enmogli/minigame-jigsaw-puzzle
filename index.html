@@ -182,7 +182,8 @@
     // --- 主遊戲元件 ---
     function TangramGame() {
       const [isMobile, setIsMobile] = useState(false);
-      const [config, setConfig] = useState(() => getLayoutConfig(window.innerWidth < 768));
+      // 1. 將斷點從 768 提升至 1024，確保平板直立模式能正確觸發「上下分割」的直式排版
+      const [config, setConfig] = useState(() => getLayoutConfig(window.innerWidth < 1024));
       const [pieces, setPieces] = useState(config.initialPieces);
       const [selectedId, setSelectedId] = useState(null);
       const [isWin, setIsWin] = useState(false);
@@ -194,7 +195,8 @@
 
       useEffect(() => {
         const checkMobile = () => {
-          const mobile = window.innerWidth < 768;
+          // 2. 同步更新監聽器的斷點至 1024
+          const mobile = window.innerWidth < 1024;
           if (mobile !== isMobile) {
             setIsMobile(mobile);
             const newConfig = getLayoutConfig(mobile);
@@ -402,8 +404,8 @@
             </div>
           </div>
 
-          {/* Canvas Area - 修正了 max-w-6xl 確保大螢幕不會過度伸展 */}
-          <div className="relative w-full flex-1 max-w-6xl flex justify-center items-center p-2 sm:p-4 mx-auto">
+          {/* Canvas Area - 3. 增加 pb-28 (底部內距) 確保積木在最下方時，不會被控制面板擋住 */}
+          <div className="relative w-full flex-1 max-w-6xl flex justify-center items-center p-2 pb-28 sm:p-4 sm:pb-28 mx-auto">
             
             {/* Victory Overlay */}
             {isWin && (
@@ -482,8 +484,8 @@
               })}
             </svg>
 
-            {/* Controls */}
-            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex justify-center pointer-events-none z-10 w-full px-2 sm:px-0">
+            {/* Controls - 4. 改用 fixed 定位並提高 z-index，無視容器變形，強制鎖定於裝置螢幕底部 */}
+            <div className="fixed bottom-8 sm:bottom-10 left-1/2 transform -translate-x-1/2 flex justify-center pointer-events-none z-30 w-full px-2 sm:px-0">
               <div className="bg-white/95 backdrop-blur-md px-3 sm:px-5 py-2 sm:py-3 rounded-full shadow-lg border border-slate-200 pointer-events-auto flex gap-1 sm:gap-3 items-center whitespace-nowrap overflow-x-auto max-w-full">
                 <span className="text-slate-500 text-xs sm:text-sm font-medium mr-1 hidden sm:inline">控制：</span>
                 <button onClick={() => applyAction('rotate-ccw')} disabled={!selectedId || isWin} className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40">↺ 逆轉</button>
