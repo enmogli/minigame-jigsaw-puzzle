@@ -119,7 +119,6 @@
 
     // --- 響應式配置引擎 ---
     const getLayoutConfig = (isMobile) => {
-      // 擴充基礎解析度，避免積木貼齊邊緣導致裁切
       const TARGET_CX = isMobile ? 300 : 280;
       const TARGET_CY = isMobile ? 240 : 300;
       const SNAP_RADIUS = 75;
@@ -157,7 +156,6 @@
         }
       }
 
-      // 重新優化初始座標，使其集中於積木區，避免超出 ViewBox
       const initialPieces = isMobile ? [
         { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 200, y: 620, rot: 45, flipX: 1, isSnapped: false },
         { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 400, y: 620, rot: -45, flipX: 1, isSnapped: false },
@@ -182,7 +180,6 @@
     // --- 主遊戲元件 ---
     function TangramGame() {
       const [isMobile, setIsMobile] = useState(false);
-      // 1. 將斷點從 768 提升至 1024，確保平板直立模式能正確觸發「上下分割」的直式排版
       const [config, setConfig] = useState(() => getLayoutConfig(window.innerWidth < 1024));
       const [pieces, setPieces] = useState(config.initialPieces);
       const [selectedId, setSelectedId] = useState(null);
@@ -195,7 +192,6 @@
 
       useEffect(() => {
         const checkMobile = () => {
-          // 2. 同步更新監聽器的斷點至 1024
           const mobile = window.innerWidth < 1024;
           if (mobile !== isMobile) {
             setIsMobile(mobile);
@@ -268,10 +264,21 @@
       const handlePointerMove = (e) => {
         if (!dragInfo.current.isDragging || !dragInfo.current.id) return;
         const pos = getPointerPos(e);
+        
+        // 核心修正 1：絕對邊界鎖定 (防止積木跑出畫面)
+        const [,, vw, vh] = config.viewBox.split(' ').map(Number);
+        const MARGIN = 80; // 邊界緩衝區
+        let newX = pos.x + dragInfo.current.offsetX;
+        let newY = pos.y + dragInfo.current.offsetY;
+        
+        // 利用 Math.max 與 Math.min 強制將座標鉗制在 ViewBox 範圍內
+        newX = Math.max(MARGIN, Math.min(newX, vw - MARGIN));
+        newY = Math.max(MARGIN, Math.min(newY, vh - MARGIN));
+
         setPieces((prev) =>
           prev.map((p) =>
             p.id === dragInfo.current.id
-              ? { ...p, x: pos.x + dragInfo.current.offsetX, y: pos.y + dragInfo.current.offsetY }
+              ? { ...p, x: newX, y: newY }
               : p
           )
         );
@@ -296,6 +303,7 @@
           const otherPieces = prev.filter((p) => p.id !== pieceId);
           const otherPolygons = otherPieces.map((p) => getGlobalVertices(p));
 
+          // 1. 優先判定：是否完美符合最終勝利的解答槽位
           for (let slot of validSlots) {
             const dist = Math.hypot(piece.x - slot.x, piece.y - slot.y);
             if (dist < 45) {
@@ -327,12 +335,37 @@
             const distToCenter = Math.hypot(piece.x - config.TARGET_CX, piece.y - config.TARGET_CY);
 
             if (distToCenter < 200) {
-              let gridX = Math.round((piece.x - config.TARGET_CX) / 30) * 30 + config.TARGET_CX;
-              let gridY = Math.round((piece.y - config.TARGET_CY) / 30) * 30 + config.TARGET_CY;
+              let tempX = piece.x;
+              let tempY = piece.y;
 
-              const tempPiece = { ...piece, x: gridX, y: gridY };
-              const pPoly = getGlobalVertices(tempPiece);
+              // 核心修正 2：更細膩的 15px 網格基礎對齊 (配合七巧板的根號幾何尺寸)
+              tempX = Math.round((tempX - config.TARGET_CX) / 15) * 15 + config.TARGET_CX;
+              tempY = Math.round((tempY - config.TARGET_CY) / 15) * 15 + config.TARGET_CY;
 
+              // 核心修正 3：智慧邊緣磁吸 (Edge Snapping) - 就算不正確，也讓積木貼齊虛線邊界
+              const boxMinX = config.TARGET_CX - 120;
+              const boxMaxX = config.TARGET_CX + 120;
+              const boxMinY = config.TARGET_CY - 120;
+              const boxMaxY = config.TARGET_CY + 120;
+
+              // 計算積木當下的實體包絡線 (Bounding Box)
+              let pPoly = getGlobalVertices({ ...piece, x: tempX, y: tempY });
+              let pMinX = Math.min(...pPoly.map(v => v[0]));
+              let pMaxX = Math.max(...pPoly.map(v => v[0]));
+              let pMinY = Math.min(...pPoly.map(v => v[1]));
+              let pMaxY = Math.max(...pPoly.map(v => v[1]));
+
+              const EDGE_SNAP = 25; // 邊緣磁吸容錯距離
+              
+              // 檢查積木邊緣是否靠近目標框邊緣，若是則強力貼齊
+              if (Math.abs(pMinX - boxMinX) < EDGE_SNAP) tempX += (boxMinX - pMinX);
+              else if (Math.abs(pMaxX - boxMaxX) < EDGE_SNAP) tempX += (boxMaxX - pMaxX);
+
+              if (Math.abs(pMinY - boxMinY) < EDGE_SNAP) tempY += (boxMinY - pMinY);
+              else if (Math.abs(pMaxY - boxMaxY) < EDGE_SNAP) tempY += (boxMaxY - pMaxY);
+
+              // 進行邊緣修正後，重新計算多邊形以確保未與其他積木重疊
+              pPoly = getGlobalVertices({ ...piece, x: tempX, y: tempY });
               let hasCollision = false;
               for (let op of otherPolygons) {
                 if (checkOverlap(pPoly, op)) {
@@ -342,6 +375,7 @@
               }
 
               if (hasCollision) {
+                // 如果實體重疊，彈出防線
                 let angle = Math.atan2(piece.y - config.TARGET_CY, piece.x - config.TARGET_CX);
                 if (distToCenter < 5) angle = Math.random() * Math.PI * 2;
                 const pushX = config.TARGET_CX + Math.cos(angle) * 220;
@@ -350,8 +384,9 @@
                   p.id === pieceId ? { ...p, x: pushX, y: pushY, isSnapped: false } : p
                 );
               } else {
+                // 若無重疊且已貼齊邊界，允許自由停留
                 return prev.map((p) =>
-                  p.id === pieceId ? { ...p, x: gridX, y: gridY, isSnapped: false } : p
+                  p.id === pieceId ? { ...p, x: tempX, y: tempY, isSnapped: false } : p
                 );
               }
             }
@@ -404,7 +439,6 @@
             </div>
           </div>
 
-          {/* Canvas Area - 3. 增加 pb-28 (底部內距) 確保積木在最下方時，不會被控制面板擋住 */}
           <div className="relative w-full flex-1 max-w-6xl flex justify-center items-center p-2 pb-28 sm:p-4 sm:pb-28 mx-auto">
             
             {/* Victory Overlay */}
@@ -484,7 +518,7 @@
               })}
             </svg>
 
-            {/* Controls - 4. 改用 fixed 定位並提高 z-index，無視容器變形，強制鎖定於裝置螢幕底部 */}
+            {/* Controls */}
             <div className="fixed bottom-8 sm:bottom-10 left-1/2 transform -translate-x-1/2 flex justify-center pointer-events-none z-30 w-full px-2 sm:px-0">
               <div className="bg-white/95 backdrop-blur-md px-3 sm:px-5 py-2 sm:py-3 rounded-full shadow-lg border border-slate-200 pointer-events-auto flex gap-1 sm:gap-3 items-center whitespace-nowrap overflow-x-auto max-w-full">
                 <span className="text-slate-500 text-xs sm:text-sm font-medium mr-1 hidden sm:inline">控制：</span>
