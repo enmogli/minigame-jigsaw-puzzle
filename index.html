@@ -2,23 +2,19 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <!-- 鎖定視角與縮放，確保手機端拖曳體驗完美 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>數位七巧板 Tangram</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>數位七巧板 Tangram - Sandbox Edition</title>
   
-  <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- 引入 React 與 ReactDOM -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  
-  <!-- 引入 Babel 負責在瀏覽器即時編譯 JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* 確保全域禁止原生觸控滾動，避免與拖曳手勢衝突 */
     body { overscroll-behavior-y: none; touch-action: none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
 <body class="bg-slate-50 overflow-hidden font-sans select-none">
@@ -117,85 +113,164 @@
       playNote(523.25, now + 0.3, 1.5); 
     };
 
-    // --- 響應式配置引擎 ---
-    const getLayoutConfig = (isMobile) => {
+    // --- 預設官方圖庫 ---
+    const PUZZLES = [
+      {
+        id: 'diamond', // 旋轉鑽石 (正方形45度精準旋轉矩陣)
+        targets: [
+          { id: 'LT1', type: 'LT', x: -84.85, y: -84.85, rot: 315, flipX: 1 }, 
+          { id: 'LT2', type: 'LT', x: 84.85, y: -84.85, rot: 45, flipX: 1 }, 
+          { id: 'MT',  type: 'MT', x: 0, y: 169.71, rot: 45, flipX: 1 }, 
+          { id: 'SQ',  type: 'SQ', x: -42.43, y: 42.43, rot: 45, flipX: 1 }, 
+          { id: 'ST1', type: 'ST', x: -127.28, y: 42.43, rot: 45, flipX: 1 }, 
+          { id: 'ST2', type: 'ST', x: 42.43, y: 42.43, rot: 315, flipX: 1 }, 
+          { id: 'PA',  type: 'PA', x: 84.85, y: 42.43, rot: 315, flipX: -1 } 
+        ]
+      },
+      {
+        id: 'user_creation_1', // 新創關卡
+        targets: [
+          { id: 'SQ', type: 'SQ', x: 120, y: -60, rot: 0, flipX: 1 },
+          { id: 'LT1', type: 'LT', x: 90, y: -30, rot: 45, flipX: 1 },
+          { id: 'PA', type: 'PA', x: 15, y: -150, rot: 0, flipX: 1 },
+          { id: 'MT', type: 'MT', x: 225, y: 135, rot: 0, flipX: 1 },
+          { id: 'LT2', type: 'LT', x: -90, y: -30, rot: -45, flipX: 1 },
+          { id: 'ST1', type: 'ST', x: -135, y: 105, rot: 225, flipX: 1 },
+          { id: 'ST2', type: 'ST', x: -195, y: -15, rot: 135, flipX: 1 }
+        ]
+      },
+      {
+        id: 'user_creation_2', // 新創關卡 2
+        targets: [
+          { id: 'LT1', type: 'LT', x: 15, y: -135, rot: 45, flipX: 1 },
+          { id: 'LT2', type: 'LT', x: 15, y: -135, rot: 225, flipX: 1 },
+          { id: 'MT', type: 'MT', x: 105, y: -105, rot: 90, flipX: 1 },
+          { id: 'SQ', type: 'SQ', x: 15, y: 0, rot: 315, flipX: 1 },
+          { id: 'PA', type: 'PA', x: -15, y: 75, rot: 0, flipX: 1 },
+          { id: 'ST1', type: 'ST', x: -120, y: 150, rot: 135, flipX: 1 },
+          { id: 'ST2', type: 'ST', x: -30, y: 150, rot: 225, flipX: 1 }
+        ]
+      },
+      {
+        id: 'user_creation_3', // 新創關卡 3
+        targets: [
+          { id: 'LT1', type: 'LT', x: -105, y: 45, rot: 180, flipX: 1 },
+          { id: 'PA', type: 'PA', x: -30, y: -45, rot: 45, flipX: 1 },
+          { id: 'SQ', type: 'SQ', x: 30, y: -90, rot: 0, flipX: 1 },
+          { id: 'ST1', type: 'ST', x: 75, y: -75, rot: 135, flipX: 1 },
+          { id: 'MT', type: 'MT', x: -75, y: 135, rot: 45, flipX: 1 },
+          { id: 'LT2', type: 'LT', x: 15, y: 165, rot: 180, flipX: 1 },
+          { id: 'ST2', type: 'ST', x: 90, y: -150, rot: 180, flipX: 1 }
+        ]
+      },
+      {
+        id: 'user_creation_4', // 新創關卡 4
+        targets: [
+          { id: 'PA', type: 'PA', x: -150, y: -30, rot: 270, flipX: 1 },
+          { id: 'MT', type: 'MT', x: -120, y: -60, rot: 180, flipX: 1 },
+          { id: 'ST1', type: 'ST', x: -60, y: 60, rot: 0, flipX: 1 },
+          { id: 'SQ', type: 'SQ', x: 0, y: 0, rot: 0, flipX: 1 },
+          { id: 'ST2', type: 'ST', x: 60, y: -60, rot: 180, flipX: 1 },
+          { id: 'LT1', type: 'LT', x: 120, y: 60, rot: 180, flipX: 1 },
+          { id: 'LT2', type: 'LT', x: 195, y: 15, rot: 225, flipX: 1 }
+        ]
+      }
+    ];
+
+    // --- 響應式與沙盒配置引擎 ---
+    const getLayoutConfig = (isMobile, puzzleIndex = 0, allPuzzles = PUZZLES, isSandbox = false) => {
       const TARGET_CX = isMobile ? 300 : 280;
       const TARGET_CY = isMobile ? 240 : 300;
-      const SNAP_RADIUS = 75;
+      
+      const baseTargets = isSandbox ? [] : allPuzzles[puzzleIndex]?.targets || [];
 
-      const baseTargets = [
-        { id: 'LT1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], x: TARGET_CX - 120, y: TARGET_CY, rot: 270, flipX: 1 }, 
-        { id: 'LT2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], x: TARGET_CX, y: TARGET_CY - 120, rot: 0, flipX: 1 }, 
-        { id: 'MT',  type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], x: TARGET_CX + 120, y: TARGET_CY + 120, rot: 0, flipX: 1 }, 
-        { id: 'SQ',  type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], x: TARGET_CX, y: TARGET_CY + 60, rot: 0, flipX: 1 }, 
-        { id: 'ST1', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], x: TARGET_CX - 60, y: TARGET_CY + 120, rot: 0, flipX: 1 }, 
-        { id: 'ST2', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], x: TARGET_CX + 60, y: TARGET_CY, rot: 270, flipX: 1 }, 
-        { id: 'PA',  type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], x: TARGET_CX + 90, y: TARGET_CY - 30, rot: 270, flipX: -1 } 
-      ];
+      const allSlots = baseTargets.map(bt => ({
+        type: bt.type,
+        x: TARGET_CX + bt.x,
+        y: TARGET_CY + bt.y,
+        rot: bt.rot,
+        flipX: bt.flipX || 1,
+        localPoints: getLocalPoints(bt.type)
+      }));
 
-      const allSlots = [];
-      for (let flip of [1, -1]) {
-        for (let angle of [0, 90, 180, 270]) {
-          for (let bt of baseTargets) {
-            let nx = bt.x - TARGET_CX;
-            let ny = bt.y - TARGET_CY;
-            if (flip === -1) nx = -nx;
-            let rad = (angle * Math.PI) / 180;
-            let rx = nx * Math.cos(rad) - ny * Math.sin(rad);
-            let ry = nx * Math.sin(rad) + ny * Math.cos(rad);
-            let effectiveRot = flip === -1 ? -bt.rot : bt.rot;
-            allSlots.push({
-              type: bt.type,
-              x: TARGET_CX + rx,
-              y: TARGET_CY + ry,
-              rot: (effectiveRot + angle + 360) % 360,
-              flipX: bt.flipX * flip,
-              localPoints: bt.localPoints
-            });
-          }
-        }
+      let boxMinX = Infinity, boxMaxX = -Infinity, boxMinY = Infinity, boxMaxY = -Infinity;
+      if (!isSandbox && baseTargets.length > 0) {
+        baseTargets.forEach(t => {
+          const tempLocal = getLocalPoints(t.type);
+          const gPoints = getGlobalVertices({...t, x: TARGET_CX + t.x, y: TARGET_CY + t.y, localPoints: tempLocal});
+          gPoints.forEach(pt => {
+            boxMinX = Math.min(boxMinX, pt[0]);
+            boxMaxX = Math.max(boxMaxX, pt[0]);
+            boxMinY = Math.min(boxMinY, pt[1]);
+            boxMaxY = Math.max(boxMaxY, pt[1]);
+          });
+        });
       }
+      const targetBounds = { boxMinX, boxMaxX, boxMinY, boxMaxY };
 
       const initialPieces = isMobile ? [
-        { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 200, y: 620, rot: 45, flipX: 1, isSnapped: false },
-        { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 400, y: 620, rot: -45, flipX: 1, isSnapped: false },
-        { id: '3', type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], color: '#F9B42A', x: 300, y: 780, rot: 90, flipX: 1, isSnapped: false },
-        { id: '4', type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], color: '#A592C4', x: 140, y: 820, rot: 0, flipX: 1, isSnapped: false },
-        { id: '5', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F38AB8', x: 460, y: 820, rot: 135, flipX: 1, isSnapped: false },
-        { id: '6', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F6E927', x: 240, y: 920, rot: 225, flipX: 1, isSnapped: false },
-        { id: '7', type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], color: '#EB3A52', x: 400, y: 920, rot: 0, flipX: 1, isSnapped: false }
+        { id: '1', type: 'LT', localPoints: getLocalPoints('LT'), color: '#65C1D0', x: 200, y: 620, rot: 45, flipX: 1, isSnapped: false },
+        { id: '2', type: 'LT', localPoints: getLocalPoints('LT'), color: '#BCE28A', x: 400, y: 620, rot: -45, flipX: 1, isSnapped: false },
+        { id: '3', type: 'MT', localPoints: getLocalPoints('MT'), color: '#F9B42A', x: 300, y: 780, rot: 90, flipX: 1, isSnapped: false },
+        { id: '4', type: 'SQ', localPoints: getLocalPoints('SQ'), color: '#A592C4', x: 140, y: 820, rot: 0, flipX: 1, isSnapped: false },
+        { id: '5', type: 'ST', localPoints: getLocalPoints('ST'), color: '#F38AB8', x: 460, y: 820, rot: 135, flipX: 1, isSnapped: false },
+        { id: '6', type: 'ST', localPoints: getLocalPoints('ST'), color: '#F6E927', x: 240, y: 920, rot: 225, flipX: 1, isSnapped: false },
+        { id: '7', type: 'PA', localPoints: getLocalPoints('PA'), color: '#EB3A52', x: 400, y: 920, rot: 0, flipX: 1, isSnapped: false }
       ] : [
-        { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 680, y: 180, rot: 45, flipX: 1, isSnapped: false },
-        { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 860, y: 180, rot: -45, flipX: 1, isSnapped: false },
-        { id: '3', type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], color: '#F9B42A', x: 770, y: 350, rot: 90, flipX: 1, isSnapped: false },
-        { id: '4', type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], color: '#A592C4', x: 880, y: 350, rot: 0, flipX: 1, isSnapped: false },
-        { id: '5', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F38AB8', x: 640, y: 480, rot: 135, flipX: 1, isSnapped: false },
-        { id: '6', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F6E927', x: 770, y: 480, rot: 225, flipX: 1, isSnapped: false },
-        { id: '7', type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], color: '#EB3A52', x: 900, y: 480, rot: 0, flipX: 1, isSnapped: false }
+        { id: '1', type: 'LT', localPoints: getLocalPoints('LT'), color: '#65C1D0', x: 680, y: 180, rot: 45, flipX: 1, isSnapped: false },
+        { id: '2', type: 'LT', localPoints: getLocalPoints('LT'), color: '#BCE28A', x: 860, y: 180, rot: -45, flipX: 1, isSnapped: false },
+        { id: '3', type: 'MT', localPoints: getLocalPoints('MT'), color: '#F9B42A', x: 770, y: 350, rot: 90, flipX: 1, isSnapped: false },
+        { id: '4', type: 'SQ', localPoints: getLocalPoints('SQ'), color: '#A592C4', x: 880, y: 350, rot: 0, flipX: 1, isSnapped: false },
+        { id: '5', type: 'ST', localPoints: getLocalPoints('ST'), color: '#F38AB8', x: 640, y: 480, rot: 135, flipX: 1, isSnapped: false },
+        { id: '6', type: 'ST', localPoints: getLocalPoints('ST'), color: '#F6E927', x: 770, y: 480, rot: 225, flipX: 1, isSnapped: false },
+        { id: '7', type: 'PA', localPoints: getLocalPoints('PA'), color: '#EB3A52', x: 900, y: 480, rot: 0, flipX: 1, isSnapped: false }
       ];
 
-      return { TARGET_CX, TARGET_CY, SNAP_RADIUS, allSlots, initialPieces, viewBox: isMobile ? "0 0 600 1000" : "0 0 1000 600", isMobile };
+      return { TARGET_CX, TARGET_CY, allSlots, initialPieces, targetBounds, baseTargets, viewBox: isMobile ? "0 0 600 1000" : "0 0 1000 600", isMobile, isSandbox };
     };
+
+    function getLocalPoints(type) {
+      switch(type) {
+        case 'LT': return [[-120, 0], [120, 0], [0, 120]];
+        case 'MT': return [[0, 0], [0, -120], [-120, 0]];
+        case 'SQ': return [[-60, 0], [0, -60], [60, 0], [0, 60]];
+        case 'ST': return [[-60, 0], [60, 0], [0, -60]];
+        case 'PA': return [[-90, 30], [-30, -30], [90, -30], [30, 30]];
+        default: return [];
+      }
+    }
 
     // --- 主遊戲元件 ---
     function TangramGame() {
+      const [customPuzzles, setCustomPuzzles] = useState([]);
+      const allPuzzles = [...PUZZLES, ...customPuzzles];
+      
+      const [isSandbox, setIsSandbox] = useState(false);
+      const [puzzleIndex, setPuzzleIndex] = useState(0);
       const [isMobile, setIsMobile] = useState(false);
-      const [config, setConfig] = useState(() => getLayoutConfig(window.innerWidth < 1024));
+      
+      const [config, setConfig] = useState(() => getLayoutConfig(window.innerWidth < 1024, 0, allPuzzles, false));
       const [pieces, setPieces] = useState(config.initialPieces);
       const [selectedId, setSelectedId] = useState(null);
       const [isWin, setIsWin] = useState(false);
       const [history, setHistory] = useState([]);
       const [showHistory, setShowHistory] = useState(false);
+      const [exportCode, setExportCode] = useState(null); 
+      
+      // 新增：用於控制載入面板與輸入文本的狀態
+      const [isImporting, setIsImporting] = useState(false);
+      const [importText, setImportText] = useState("");
 
       const svgRef = useRef(null);
       const dragInfo = useRef({ isDragging: false, id: null, offsetX: 0, offsetY: 0 });
 
+      // 視窗尺寸變更處理
       useEffect(() => {
         const checkMobile = () => {
           const mobile = window.innerWidth < 1024;
           if (mobile !== isMobile) {
             setIsMobile(mobile);
-            const newConfig = getLayoutConfig(mobile);
+            const newConfig = getLayoutConfig(mobile, puzzleIndex, allPuzzles, isSandbox);
             setConfig(newConfig);
             setPieces(JSON.parse(JSON.stringify(newConfig.initialPieces)));
             setIsWin(false);
@@ -204,9 +279,109 @@
         checkMobile();
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
-      }, [isMobile]);
+      }, [isMobile, puzzleIndex, allPuzzles, isSandbox]);
 
+      // 切換為沙盒模式
+      const handleToggleSandbox = () => {
+        setIsSandbox(true);
+        setIsWin(false);
+        const newConfig = getLayoutConfig(isMobile, 0, allPuzzles, true);
+        setConfig(newConfig);
+        setPieces(JSON.parse(JSON.stringify(newConfig.initialPieces)));
+        setSelectedId(null);
+      };
+
+      // 開啟載入面板
+      const handleImportClick = () => {
+        setIsImporting(true);
+        setImportText("");
+      };
+
+      // 執行載入自定義 JSON
+      const submitImport = () => {
+        if (!importText.trim()) return;
+        try {
+          const targets = JSON.parse(importText);
+          if (!Array.isArray(targets) || targets.length !== 7) throw new Error();
+          
+          const newPuzzle = { id: 'custom-' + Date.now(), targets: targets };
+          const newCustomPuzzles = [...customPuzzles, newPuzzle];
+          setCustomPuzzles(newCustomPuzzles);
+          
+          const newIdx = PUZZLES.length + newCustomPuzzles.length - 1;
+          setPuzzleIndex(newIdx);
+          setIsSandbox(false);
+          
+          const combinedPuzzles = [...PUZZLES, ...newCustomPuzzles];
+          const newConfig = getLayoutConfig(isMobile, newIdx, combinedPuzzles, false);
+          setConfig(newConfig);
+          setPieces(JSON.parse(JSON.stringify(newConfig.initialPieces)));
+          setIsWin(false);
+          setSelectedId(null);
+          setIsImporting(false); // 關閉面板
+          
+          alert("✅ 成功載入自定義關卡！");
+        } catch (err) {
+          alert("❌ 代碼無效或格式錯誤，請確保貼上完整的代碼。");
+        }
+      };
+
+      // 匯出當前沙盒拼圖為 JSON
+      const handleExport = () => {
+        // 自動校正：計算所有積木目前的幾何中心點，使其對齊配置中心
+        const avgX = pieces.reduce((sum, p) => sum + p.x, 0) / 7;
+        const avgY = pieces.reduce((sum, p) => sum + p.y, 0) / 7;
+        const offsetX = Math.round((avgX - config.TARGET_CX) / 15) * 15;
+        const offsetY = Math.round((avgY - config.TARGET_CY) / 15) * 15;
+
+        const typeCount = {};
+        const targets = pieces.map(p => {
+          const tType = p.type;
+          typeCount[tType] = (typeCount[tType] || 0) + 1;
+          const tId = tType + (tType === 'LT' || tType === 'ST' ? typeCount[tType] : '');
+          return {
+            id: tId,
+            type: tType,
+            x: Math.round(p.x - config.TARGET_CX - offsetX),
+            y: Math.round(p.y - config.TARGET_CY - offsetY),
+            rot: p.rot,
+            flipX: p.flipX
+          };
+        });
+        
+        const jsonStr = JSON.stringify(targets);
+        setExportCode(jsonStr); // 改為觸發自定義 UI，避免瀏覽器阻擋 prompt 彈出視窗
+      };
+
+      // 複製代碼到剪貼簿 (相容 iFrame 環境)
+      const copyToClipboard = () => {
+        try {
+          const textArea = document.createElement("textarea");
+          textArea.value = exportCode;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+          alert('✅ 已成功複製代碼！\n請將這段代碼傳送給我，我將為您永久新增至官方圖庫中。');
+        } catch (err) {
+          alert('複製失敗，請手動全選文字框內的代碼並複製。');
+        }
+      };
+
+      // 切換既有關卡
+      const handlePuzzleChange = (idx) => {
+        setPuzzleIndex(idx);
+        setIsSandbox(false);
+        const newConfig = getLayoutConfig(isMobile, idx, allPuzzles, false);
+        setConfig(newConfig);
+        setPieces(JSON.parse(JSON.stringify(newConfig.initialPieces)));
+        setIsWin(false);
+        setSelectedId(null);
+      };
+
+      // 勝利判定
       useEffect(() => {
+        if (isSandbox) { setIsWin(false); return; } // 沙盒模式不判定勝利
         const checkWin = pieces.every((p) => p.isSnapped);
         if (checkWin && !isWin) {
           setIsWin(true);
@@ -221,7 +396,7 @@
         } else if (!checkWin && isWin) {
           setIsWin(false);
         }
-      }, [pieces, isWin]);
+      }, [pieces, isWin, isSandbox]);
 
       const handleReset = () => {
         setPieces(JSON.parse(JSON.stringify(config.initialPieces)));
@@ -264,24 +439,13 @@
       const handlePointerMove = (e) => {
         if (!dragInfo.current.isDragging || !dragInfo.current.id) return;
         const pos = getPointerPos(e);
-        
-        // 核心修正 1：絕對邊界鎖定 (防止積木跑出畫面)
         const [,, vw, vh] = config.viewBox.split(' ').map(Number);
-        const MARGIN = 80; // 邊界緩衝區
+        const MARGIN = 80; 
         let newX = pos.x + dragInfo.current.offsetX;
         let newY = pos.y + dragInfo.current.offsetY;
-        
-        // 利用 Math.max 與 Math.min 強制將座標鉗制在 ViewBox 範圍內
         newX = Math.max(MARGIN, Math.min(newX, vw - MARGIN));
         newY = Math.max(MARGIN, Math.min(newY, vh - MARGIN));
-
-        setPieces((prev) =>
-          prev.map((p) =>
-            p.id === dragInfo.current.id
-              ? { ...p, x: newX, y: newY }
-              : p
-          )
-        );
+        setPieces((prev) => prev.map((p) => p.id === dragInfo.current.id ? { ...p, x: newX, y: newY } : p));
       };
 
       const handlePointerUp = (e) => {
@@ -296,17 +460,44 @@
           const piece = prev.find((p) => p.id === pieceId);
           if (!piece) return prev;
 
-          let bestSlot = null;
-          let minDistance = 45;
-
-          const validSlots = config.allSlots.filter((slot) => slot.type === piece.type);
           const otherPieces = prev.filter((p) => p.id !== pieceId);
           const otherPolygons = otherPieces.map((p) => getGlobalVertices(p));
 
-          // 1. 優先判定：是否完美符合最終勝利的解答槽位
+          // 🛠️ 沙盒模式專屬邏輯 (僅保留無縫網格吸附與防重疊互斥)
+          if (isSandbox) {
+            const distToCenter = Math.hypot(piece.x - config.TARGET_CX, piece.y - config.TARGET_CY);
+            if (distToCenter < 400) {
+              let tempX = Math.round((piece.x - config.TARGET_CX) / 15) * 15 + config.TARGET_CX;
+              let tempY = Math.round((piece.y - config.TARGET_CY) / 15) * 15 + config.TARGET_CY;
+              let pPoly = getGlobalVertices({ ...piece, x: tempX, y: tempY });
+              
+              let hasCollision = false;
+              for (let op of otherPolygons) {
+                if (checkOverlap(pPoly, op)) { hasCollision = true; break; }
+              }
+
+              if (hasCollision) {
+                let angle = Math.atan2(piece.y - config.TARGET_CY, piece.x - config.TARGET_CX);
+                if (Math.hypot(piece.x - config.TARGET_CX, piece.y - config.TARGET_CY) < 5) angle = Math.random() * Math.PI * 2;
+                const pushX = config.TARGET_CX + Math.cos(angle) * 260;
+                const pushY = config.TARGET_CY + Math.sin(angle) * 260;
+                return prev.map((p) => p.id === pieceId ? { ...p, x: pushX, y: pushY, isSnapped: false } : p);
+              } else {
+                return prev.map((p) => p.id === pieceId ? { ...p, x: tempX, y: tempY, isSnapped: true } : p); // 沙盒模式下，放置在網格上即視為就緒
+              }
+            } else {
+              return prev.map((p) => p.id === pieceId ? { ...p, isSnapped: false } : p);
+            }
+          }
+
+          // 🧩 普通解謎模式邏輯
+          let bestSlot = null;
+          let minDistance = 75;
+          const validSlots = config.allSlots.filter((slot) => slot.type === piece.type);
+
           for (let slot of validSlots) {
             const dist = Math.hypot(piece.x - slot.x, piece.y - slot.y);
-            if (dist < 45) {
+            if (dist < 75) {
               const tempPiece = { ...piece, x: slot.x, y: slot.y };
               const pPoly = getGlobalVertices(tempPiece);
               const slotPoly = getGlobalVertices(slot);
@@ -315,8 +506,7 @@
                 let isOccupied = false;
                 for (let op of otherPolygons) {
                   if (checkOverlap(slotPoly, op)) {
-                    isOccupied = true;
-                    break;
+                    isOccupied = true; break;
                   }
                 }
                 if (!isOccupied && dist < minDistance) {
@@ -328,66 +518,40 @@
           }
 
           if (bestSlot) {
-            return prev.map((p) =>
-              p.id === pieceId ? { ...p, x: bestSlot.x, y: bestSlot.y, isSnapped: true } : p
-            );
+            return prev.map((p) => p.id === pieceId ? { ...p, x: bestSlot.x, y: bestSlot.y, isSnapped: true } : p);
           } else {
             const distToCenter = Math.hypot(piece.x - config.TARGET_CX, piece.y - config.TARGET_CY);
+            if (distToCenter < 350) {
+              let tempX = Math.round((piece.x - config.TARGET_CX) / 15) * 15 + config.TARGET_CX;
+              let tempY = Math.round((piece.y - config.TARGET_CY) / 15) * 15 + config.TARGET_CY;
 
-            if (distToCenter < 200) {
-              let tempX = piece.x;
-              let tempY = piece.y;
-
-              // 核心修正 2：更細膩的 15px 網格基礎對齊 (配合七巧板的根號幾何尺寸)
-              tempX = Math.round((tempX - config.TARGET_CX) / 15) * 15 + config.TARGET_CX;
-              tempY = Math.round((tempY - config.TARGET_CY) / 15) * 15 + config.TARGET_CY;
-
-              // 核心修正 3：智慧邊緣磁吸 (Edge Snapping) - 就算不正確，也讓積木貼齊虛線邊界
-              const boxMinX = config.TARGET_CX - 120;
-              const boxMaxX = config.TARGET_CX + 120;
-              const boxMinY = config.TARGET_CY - 120;
-              const boxMaxY = config.TARGET_CY + 120;
-
-              // 計算積木當下的實體包絡線 (Bounding Box)
+              const { boxMinX, boxMaxX, boxMinY, boxMaxY } = config.targetBounds;
               let pPoly = getGlobalVertices({ ...piece, x: tempX, y: tempY });
               let pMinX = Math.min(...pPoly.map(v => v[0]));
               let pMaxX = Math.max(...pPoly.map(v => v[0]));
               let pMinY = Math.min(...pPoly.map(v => v[1]));
               let pMaxY = Math.max(...pPoly.map(v => v[1]));
 
-              const EDGE_SNAP = 25; // 邊緣磁吸容錯距離
-              
-              // 檢查積木邊緣是否靠近目標框邊緣，若是則強力貼齊
+              const EDGE_SNAP = 25; 
               if (Math.abs(pMinX - boxMinX) < EDGE_SNAP) tempX += (boxMinX - pMinX);
               else if (Math.abs(pMaxX - boxMaxX) < EDGE_SNAP) tempX += (boxMaxX - pMaxX);
-
               if (Math.abs(pMinY - boxMinY) < EDGE_SNAP) tempY += (boxMinY - pMinY);
               else if (Math.abs(pMaxY - boxMaxY) < EDGE_SNAP) tempY += (boxMaxY - pMaxY);
 
-              // 進行邊緣修正後，重新計算多邊形以確保未與其他積木重疊
               pPoly = getGlobalVertices({ ...piece, x: tempX, y: tempY });
               let hasCollision = false;
               for (let op of otherPolygons) {
-                if (checkOverlap(pPoly, op)) {
-                  hasCollision = true;
-                  break;
-                }
+                if (checkOverlap(pPoly, op)) { hasCollision = true; break; }
               }
 
               if (hasCollision) {
-                // 如果實體重疊，彈出防線
                 let angle = Math.atan2(piece.y - config.TARGET_CY, piece.x - config.TARGET_CX);
                 if (distToCenter < 5) angle = Math.random() * Math.PI * 2;
-                const pushX = config.TARGET_CX + Math.cos(angle) * 220;
-                const pushY = config.TARGET_CY + Math.sin(angle) * 220;
-                return prev.map((p) =>
-                  p.id === pieceId ? { ...p, x: pushX, y: pushY, isSnapped: false } : p
-                );
+                const pushX = config.TARGET_CX + Math.cos(angle) * 260;
+                const pushY = config.TARGET_CY + Math.sin(angle) * 260;
+                return prev.map((p) => p.id === pieceId ? { ...p, x: pushX, y: pushY, isSnapped: false } : p);
               } else {
-                // 若無重疊且已貼齊邊界，允許自由停留
-                return prev.map((p) =>
-                  p.id === pieceId ? { ...p, x: tempX, y: tempY, isSnapped: false } : p
-                );
+                return prev.map((p) => p.id === pieceId ? { ...p, x: tempX, y: tempY, isSnapped: false } : p);
               }
             }
           }
@@ -412,23 +576,35 @@
       };
 
       return (
-        <div className="flex flex-col items-center justify-start h-[100dvh] relative">
+        <div className="flex flex-col items-center justify-start h-[100dvh] relative bg-slate-50">
           
-          {/* Header */}
-          <div className="w-full flex-none px-6 py-3 flex justify-between items-center bg-white shadow-sm border-b border-slate-200 z-10">
+          <div className="w-full flex-none px-4 sm:px-6 py-3 flex justify-between items-center bg-white shadow-sm z-20 relative">
             <div>
               <h1 className="text-xl font-bold text-slate-800 tracking-tight">數位七巧板</h1>
-              <p className="text-xs text-slate-500 hidden sm:block">挑戰用不同排版填滿正方形！</p>
+              <p className="text-xs text-slate-500 hidden sm:block">
+                {isSandbox ? "🛠️ 沙盒模式：自由拼湊，產生屬於您的專屬題目" : "挑戰用積木重現所有神秘剪影！"}
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              {history.length > 0 && (
+            <div className="flex items-center gap-2 sm:gap-3">
+              {isSandbox ? (
                 <button
-                  onClick={() => setShowHistory(true)}
-                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm font-bold transition-colors shadow-sm flex items-center gap-1"
+                  onClick={handleExport}
+                  className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md text-sm font-bold transition-colors shadow-md flex items-center gap-1 animate-pulse"
                 >
-                  <span>🖼️ 圖鑑</span>
-                  <span className="bg-white text-blue-600 px-1.5 py-0.5 rounded-full text-xs">{history.length}</span>
+                  <span className="hidden sm:inline">💾 匯出代碼</span>
+                  <span className="sm:hidden">💾 匯出</span>
                 </button>
+              ) : (
+                history.length > 0 && (
+                  <button
+                    onClick={() => setShowHistory(true)}
+                    className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm font-bold transition-colors shadow-sm flex items-center gap-1"
+                  >
+                    <span className="hidden sm:inline">🖼️ 圖鑑</span>
+                    <span className="sm:hidden">🖼️</span>
+                    <span className="bg-white text-blue-600 px-1.5 py-0.5 rounded-full text-xs">{history.length}</span>
+                  </button>
+                )
               )}
               <button
                 onClick={handleReset}
@@ -439,25 +615,68 @@
             </div>
           </div>
 
+          <div className="w-full flex-none bg-slate-100 border-b border-slate-200 z-10 px-4 py-3 flex gap-3 overflow-x-auto no-scrollbar shadow-inner touch-pan-x items-center">
+            {/* 功能按鈕：沙盒與載入 */}
+            <button 
+              onClick={handleToggleSandbox} title="進入沙盒創作模式"
+              className={`flex-none w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center transition-all duration-200 ${isSandbox ? 'bg-white shadow-md border-2 border-green-500 scale-105' : 'bg-green-100/60 border border-green-200 hover:bg-green-100'}`}
+            >
+              <span className="text-2xl">🛠️</span>
+            </button>
+            <button 
+              onClick={handleImportClick} title="載入外部代碼"
+              className="flex-none w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center transition-all duration-200 bg-blue-100/60 border border-blue-200 hover:bg-blue-100"
+            >
+              <span className="text-2xl">📥</span>
+            </button>
+            <div className="w-px h-10 bg-slate-300 mx-1"></div>
+
+            {/* 所有關卡列表 (包含載入的 Custom 關卡) */}
+            {allPuzzles.map((puzzle, idx) => {
+              const isCustom = idx >= PUZZLES.length;
+              return (
+                <button 
+                  key={puzzle.id}
+                  onClick={() => handlePuzzleChange(idx)}
+                  className={`relative flex-none w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center transition-all duration-200 ${(!isSandbox && puzzleIndex === idx) ? 'bg-white shadow-md border-2 border-blue-400 scale-105' : 'bg-white/50 border border-slate-200 hover:bg-white hover:shadow-sm'}`}
+                >
+                  <svg viewBox="-300 -300 600 600" className="w-10 h-10 sm:w-12 sm:h-12 opacity-80">
+                    <g fill={isCustom ? "#f59e0b" : "#94a3b8"}>
+                      {puzzle.targets.map((t, i) => {
+                         const pts = getGlobalVertices({...t, x: t.x, y: t.y, localPoints: getLocalPoints(t.type)}).map(pt => pt.join(',')).join(' ');
+                         return <polygon key={i} points={pts} />
+                      })}
+                    </g>
+                  </svg>
+                  {isCustom && <span className="absolute -top-1 -right-1 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span></span>}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="relative w-full flex-1 max-w-6xl flex justify-center items-center p-2 pb-28 sm:p-4 sm:pb-28 mx-auto">
             
-            {/* Victory Overlay */}
-            {isWin && (
+            {isWin && !isSandbox && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-sm transition-all duration-500">
-                <div className="bg-white/95 p-8 rounded-3xl shadow-2xl flex flex-col items-center border border-green-100 transform hover:scale-105 transition-transform">
-                  <div className="text-7xl mb-4 animate-bounce">🎉</div>
-                  <h2 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-400 mb-6 drop-shadow-sm text-center">
+                <div className="bg-white/95 p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col items-center border border-green-100 transform hover:scale-105 transition-transform w-[90%] max-w-md">
+                  <div className="text-6xl sm:text-7xl mb-4 animate-bounce">🎉</div>
+                  <h2 className="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-500 to-emerald-400 mb-6 drop-shadow-sm text-center">
                     挑戰成功！
                   </h2>
-                  <p className="text-slate-500 mb-8 text-center font-medium">您已解鎖一種全新的拼法，已收錄至圖鑑中。</p>
-                  <div className="flex gap-4 w-full">
-                    <button onClick={handleReset} className="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full">
+                    <button onClick={handleReset} className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors">
                       再拼一次
                     </button>
-                    <button onClick={() => setShowHistory(true)} className="flex-1 px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-green-500/30">
-                      查看圖鑑
+                    <button onClick={() => {
+                      const nextIdx = (puzzleIndex + 1) % allPuzzles.length;
+                      handlePuzzleChange(nextIdx);
+                    }} className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold transition-colors shadow-lg">
+                      下一關
                     </button>
                   </div>
+                  <button onClick={() => setShowHistory(true)} className="w-full mt-3 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors">
+                    查看圖鑑
+                  </button>
                 </div>
               </div>
             )}
@@ -465,7 +684,7 @@
             <svg
               ref={svgRef}
               viewBox={config.viewBox}
-              className="w-full h-full max-h-full rounded-2xl bg-slate-100 shadow-inner"
+              className={`w-full h-full max-h-full rounded-2xl bg-white shadow-sm border border-slate-200 ${isSandbox ? 'bg-stripes' : ''}`}
               preserveAspectRatio="xMidYMid meet"
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
@@ -478,24 +697,36 @@
                 <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                   <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#3b82f6" floodOpacity="0.6" />
                 </filter>
+                <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+                  <circle cx="2" cy="2" r="1.5" fill="#cbd5e1" opacity="0.4" />
+                </pattern>
               </defs>
 
-              <rect
-                x={config.TARGET_CX - 120} y={config.TARGET_CY - 120} width="240" height="240"
-                fill="rgba(255,255,255,0.7)" stroke="#cbd5e1" strokeWidth="3" strokeDasharray="10 10" rx="6"
-              />
-              <text x={config.TARGET_CX} y={config.TARGET_CY - 140} textAnchor="middle" fill="#94a3b8" fontSize="18" fontWeight="bold">目標區域</text>
+              {/* 沙盒模式專屬的中心導引網格與提示 */}
+              {isSandbox ? (
+                <g>
+                  <rect x="0" y="0" width="100%" height="100%" fill="url(#grid)" />
+                  <circle cx={config.TARGET_CX} cy={config.TARGET_CY} r="250" fill="none" stroke="#e2e8f0" strokeWidth="2" strokeDasharray="10 10" />
+                  <text x={config.TARGET_CX} y={config.TARGET_CY - 270} textAnchor="middle" fill="#94a3b8" fontSize="18" fontWeight="bold">在此範圍內創作您的圖案</text>
+                </g>
+              ) : (
+                <g className="transition-all duration-500">
+                  {config.baseTargets.map((t, i) => {
+                    const pts = getGlobalVertices({...t, x: config.TARGET_CX + t.x, y: config.TARGET_CY + t.y, localPoints: getLocalPoints(t.type)}).map(pt => pt.join(',')).join(' ');
+                    const isCustom = puzzleIndex >= PUZZLES.length;
+                    return (
+                      <polygon key={i} points={pts} fill={isCustom ? "#fde68a" : "#e2e8f0"} stroke={isCustom ? "#fde68a" : "#e2e8f0"} strokeWidth="2" strokeLinejoin="round" />
+                    );
+                  })}
+                </g>
+              )}
 
               <line 
                 x1={config.isMobile ? 0 : 550} y1={config.isMobile ? 500 : 40} 
                 x2={config.isMobile ? 600 : 550} y2={config.isMobile ? 500 : 560} 
-                stroke="#e2e8f0" strokeWidth="3" strokeDasharray="6 6" 
+                stroke="#f1f5f9" strokeWidth="4" strokeDasharray="8 8" 
               />
-              <text 
-                x={config.isMobile ? 300 : 775} y={config.isMobile ? 540 : 80} 
-                textAnchor="middle" fill="#94a3b8" fontSize="18" fontWeight="bold">積木區
-              </text>
-
+              
               {pieces.map((p) => {
                 const isSelected = p.id === selectedId;
                 const isDragging = dragInfo.current.id === p.id;
@@ -518,18 +749,16 @@
               })}
             </svg>
 
-            {/* Controls */}
             <div className="fixed bottom-8 sm:bottom-10 left-1/2 transform -translate-x-1/2 flex justify-center pointer-events-none z-30 w-full px-2 sm:px-0">
               <div className="bg-white/95 backdrop-blur-md px-3 sm:px-5 py-2 sm:py-3 rounded-full shadow-lg border border-slate-200 pointer-events-auto flex gap-1 sm:gap-3 items-center whitespace-nowrap overflow-x-auto max-w-full">
                 <span className="text-slate-500 text-xs sm:text-sm font-medium mr-1 hidden sm:inline">控制：</span>
-                <button onClick={() => applyAction('rotate-ccw')} disabled={!selectedId || isWin} className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40">↺ 逆轉</button>
-                <button onClick={() => applyAction('rotate-cw')} disabled={!selectedId || isWin} className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40">↻ 順轉</button>
+                <button onClick={() => applyAction('rotate-ccw')} disabled={!selectedId || (isWin && !isSandbox)} className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40">↺ 逆轉</button>
+                <button onClick={() => applyAction('rotate-cw')} disabled={!selectedId || (isWin && !isSandbox)} className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40">↻ 順轉</button>
                 <div className="w-px h-5 sm:h-6 bg-slate-200 mx-0.5 sm:mx-1"></div>
-                <button onClick={() => applyAction('flip')} disabled={!selectedId || isWin || pieces.find((p) => p.id === selectedId)?.type !== 'PA'} className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-pink-50 text-slate-700 hover:text-pink-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40" title="僅平行四邊形可翻面">⇄ 翻面</button>
+                <button onClick={() => applyAction('flip')} disabled={!selectedId || (isWin && !isSandbox) || pieces.find((p) => p.id === selectedId)?.type !== 'PA'} className="px-3 sm:px-3 py-1.5 bg-slate-100 hover:bg-pink-50 text-slate-700 hover:text-pink-600 rounded-md text-xs sm:text-sm font-bold transition-colors disabled:opacity-40" title="僅平行四邊形可翻面">⇄ 翻面</button>
               </div>
             </div>
           </div>
-
           {/* History Modal */}
           {showHistory && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-8">
@@ -543,22 +772,98 @@
                 
                 <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {history.map((record, index) => (
-                      <div key={index} className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
-                        <div className="aspect-square bg-slate-50 rounded-xl flex items-center justify-center overflow-hidden relative">
-                          <svg viewBox="110 135 280 280" className="w-full h-full transform group-hover:scale-105 transition-transform duration-300">
-                            {record.pieces.map((p) => {
-                              const pointsStr = p.localPoints.map((pt) => pt.join(',')).join(' ');
-                              return (
-                                <polygon key={p.id} points={pointsStr} fill={p.color} stroke="white" strokeWidth="2" strokeLinejoin="round" transform={`translate(${p.x}, ${p.y}) rotate(${p.rot}) scale(${p.flipX}, 1)`} />
-                              );
-                            })}
-                          </svg>
-                          <div className="absolute bottom-2 right-2 bg-white/80 backdrop-blur text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md">#{index + 1}</div>
+                    {history.map((record, index) => {
+                      // 動態計算縮圖的 ViewBox 以防止裁切
+                      let rMinX = Infinity, rMaxX = -Infinity, rMinY = Infinity, rMaxY = -Infinity;
+                      record.pieces.forEach(p => {
+                        const pPoly = getGlobalVertices({ ...p, x: p.x, y: p.y });
+                        pPoly.forEach(pt => {
+                          rMinX = Math.min(rMinX, pt[0]);
+                          rMaxX = Math.max(rMaxX, pt[0]);
+                          rMinY = Math.min(rMinY, pt[1]);
+                          rMaxY = Math.max(rMaxY, pt[1]);
+                        });
+                      });
+                      const pad = 40; // 四周留白 40px 呼吸空間
+                      const dynamicViewBox = `${rMinX - pad} ${rMinY - pad} ${(rMaxX - rMinX) + pad * 2} ${(rMaxY - rMinY) + pad * 2}`;
+
+                      return (
+                        <div key={index} className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
+                          <div className="aspect-square bg-slate-50 rounded-xl flex items-center justify-center overflow-hidden relative">
+                            <svg viewBox={dynamicViewBox} className="w-full h-full transform group-hover:scale-105 transition-transform duration-300">
+                              {record.pieces.map((p) => {
+                                const pointsStr = p.localPoints.map((pt) => pt.join(',')).join(' ');
+                                return (
+                                  <polygon key={p.id} points={pointsStr} fill={p.color} stroke="white" strokeWidth="2" strokeLinejoin="round" transform={`translate(${p.x}, ${p.y}) rotate(${p.rot}) scale(${p.flipX}, 1)`} />
+                                );
+                              })}
+                            </svg>
+                            <div className="absolute bottom-2 right-2 bg-white/80 backdrop-blur text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md">#{index + 1}</div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 匯出代碼專屬 Modal */}
+          {exportCode && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl transform transition-all">
+                <h3 className="text-2xl font-black text-slate-800 mb-2 flex items-center gap-2">
+                  <span>💾</span> 關卡代碼已生成
+                </h3>
+                <p className="text-sm text-slate-500 mb-4 font-medium">
+                  您的專屬圖案已轉換為幾何矩陣。請點擊複製，並將這段代碼傳送給 AI，即可永久擴充至官方圖庫！
+                </p>
+                <div className="relative">
+                  <textarea 
+                    className="w-full h-32 p-4 bg-slate-50 rounded-xl text-xs sm:text-sm font-mono text-slate-600 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-6 resize-none selection:bg-blue-200" 
+                    readOnly 
+                    value={exportCode} 
+                    onClick={(e) => e.target.select()}
+                  />
+                </div>
+                <div className="flex gap-3 w-full">
+                  <button onClick={() => setExportCode(null)} className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors">
+                    關閉
+                  </button>
+                  <button onClick={copyToClipboard} className="flex-[2] px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-green-500/30 flex items-center justify-center gap-2">
+                    <span>📋</span> 一鍵複製代碼
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 載入代碼專屬 Modal */}
+          {isImporting && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+              <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl transform transition-all">
+                <h3 className="text-2xl font-black text-slate-800 mb-2 flex items-center gap-2">
+                  <span>📥</span> 載入自定義關卡
+                </h3>
+                <p className="text-sm text-slate-500 mb-4 font-medium">
+                  請在下方貼上您或他人匯出的關卡代碼 (JSON格式)。
+                </p>
+                <div className="relative">
+                  <textarea 
+                    className="w-full h-32 p-4 bg-slate-50 rounded-xl text-xs sm:text-sm font-mono text-slate-600 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-6 resize-none selection:bg-blue-200" 
+                    placeholder='例如: [{"id":"SQ","type":"SQ", ...}]'
+                    value={importText} 
+                    onChange={(e) => setImportText(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-3 w-full">
+                  <button onClick={() => setIsImporting(false)} className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-colors">
+                    取消
+                  </button>
+                  <button onClick={submitImport} className="flex-[2] px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2">
+                    <span>🚀</span> 確認載入
+                  </button>
                 </div>
               </div>
             </div>
@@ -568,7 +873,6 @@
       );
     }
 
-    // 將 React 元件掛載到 DOM 上
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<TangramGame />);
   </script>
