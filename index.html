@@ -119,8 +119,9 @@
 
     // --- 響應式配置引擎 ---
     const getLayoutConfig = (isMobile) => {
-      const TARGET_CX = isMobile ? 300 : 250;
-      const TARGET_CY = isMobile ? 220 : 275;
+      // 擴充基礎解析度，避免積木貼齊邊緣導致裁切
+      const TARGET_CX = isMobile ? 300 : 280;
+      const TARGET_CY = isMobile ? 240 : 300;
       const SNAP_RADIUS = 75;
 
       const baseTargets = [
@@ -156,25 +157,26 @@
         }
       }
 
+      // 重新優化初始座標，使其集中於積木區，避免超出 ViewBox
       const initialPieces = isMobile ? [
-        { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 180, y: 560, rot: 45, flipX: 1, isSnapped: false },
-        { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 420, y: 560, rot: -45, flipX: 1, isSnapped: false },
-        { id: '3', type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], color: '#F9B42A', x: 300, y: 700, rot: 90, flipX: 1, isSnapped: false },
-        { id: '4', type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], color: '#A592C4', x: 150, y: 750, rot: 0, flipX: 1, isSnapped: false },
-        { id: '5', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F38AB8', x: 450, y: 750, rot: 135, flipX: 1, isSnapped: false },
-        { id: '6', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F6E927', x: 250, y: 830, rot: 225, flipX: 1, isSnapped: false },
-        { id: '7', type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], color: '#EB3A52', x: 400, y: 830, rot: 0, flipX: 1, isSnapped: false }
+        { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 200, y: 620, rot: 45, flipX: 1, isSnapped: false },
+        { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 400, y: 620, rot: -45, flipX: 1, isSnapped: false },
+        { id: '3', type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], color: '#F9B42A', x: 300, y: 780, rot: 90, flipX: 1, isSnapped: false },
+        { id: '4', type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], color: '#A592C4', x: 140, y: 820, rot: 0, flipX: 1, isSnapped: false },
+        { id: '5', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F38AB8', x: 460, y: 820, rot: 135, flipX: 1, isSnapped: false },
+        { id: '6', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F6E927', x: 240, y: 920, rot: 225, flipX: 1, isSnapped: false },
+        { id: '7', type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], color: '#EB3A52', x: 400, y: 920, rot: 0, flipX: 1, isSnapped: false }
       ] : [
-        { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 550, y: 150, rot: 45, flipX: 1, isSnapped: false },
-        { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 750, y: 150, rot: -45, flipX: 1, isSnapped: false },
-        { id: '3', type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], color: '#F9B42A', x: 600, y: 320, rot: 90, flipX: 1, isSnapped: false },
-        { id: '4', type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], color: '#A592C4', x: 750, y: 320, rot: 0, flipX: 1, isSnapped: false },
-        { id: '5', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F38AB8', x: 520, y: 440, rot: 135, flipX: 1, isSnapped: false },
-        { id: '6', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F6E927', x: 650, y: 440, rot: 225, flipX: 1, isSnapped: false },
-        { id: '7', type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], color: '#EB3A52', x: 800, y: 440, rot: 0, flipX: 1, isSnapped: false }
+        { id: '1', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#65C1D0', x: 680, y: 180, rot: 45, flipX: 1, isSnapped: false },
+        { id: '2', type: 'LT', localPoints: [[-120, 0], [120, 0], [0, 120]], color: '#BCE28A', x: 860, y: 180, rot: -45, flipX: 1, isSnapped: false },
+        { id: '3', type: 'MT', localPoints: [[0, 0], [0, -120], [-120, 0]], color: '#F9B42A', x: 770, y: 350, rot: 90, flipX: 1, isSnapped: false },
+        { id: '4', type: 'SQ', localPoints: [[-60, 0], [0, -60], [60, 0], [0, 60]], color: '#A592C4', x: 880, y: 350, rot: 0, flipX: 1, isSnapped: false },
+        { id: '5', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F38AB8', x: 640, y: 480, rot: 135, flipX: 1, isSnapped: false },
+        { id: '6', type: 'ST', localPoints: [[-60, 0], [60, 0], [0, -60]], color: '#F6E927', x: 770, y: 480, rot: 225, flipX: 1, isSnapped: false },
+        { id: '7', type: 'PA', localPoints: [[-90, 30], [-30, -30], [90, -30], [30, 30]], color: '#EB3A52', x: 900, y: 480, rot: 0, flipX: 1, isSnapped: false }
       ];
 
-      return { TARGET_CX, TARGET_CY, SNAP_RADIUS, allSlots, initialPieces, viewBox: isMobile ? "0 0 600 900" : "0 0 900 550", isMobile };
+      return { TARGET_CX, TARGET_CY, SNAP_RADIUS, allSlots, initialPieces, viewBox: isMobile ? "0 0 600 1000" : "0 0 1000 600", isMobile };
     };
 
     // --- 主遊戲元件 ---
@@ -400,8 +402,8 @@
             </div>
           </div>
 
-          {/* Canvas Area */}
-          <div className="relative w-full flex-1 w-max-6xl flex justify-center items-center p-4">
+          {/* Canvas Area - 修正了 max-w-6xl 確保大螢幕不會過度伸展 */}
+          <div className="relative w-full flex-1 max-w-6xl flex justify-center items-center p-2 sm:p-4 mx-auto">
             
             {/* Victory Overlay */}
             {isWin && (
@@ -449,12 +451,12 @@
               <text x={config.TARGET_CX} y={config.TARGET_CY - 140} textAnchor="middle" fill="#94a3b8" fontSize="18" fontWeight="bold">目標區域</text>
 
               <line 
-                x1={config.isMobile ? 0 : 450} y1={config.isMobile ? 420 : 40} 
-                x2={config.isMobile ? 600 : 450} y2={config.isMobile ? 420 : 510} 
+                x1={config.isMobile ? 0 : 550} y1={config.isMobile ? 500 : 40} 
+                x2={config.isMobile ? 600 : 550} y2={config.isMobile ? 500 : 560} 
                 stroke="#e2e8f0" strokeWidth="3" strokeDasharray="6 6" 
               />
               <text 
-                x={config.isMobile ? 300 : 675} y={config.isMobile ? 455 : config.TARGET_CY - 140} 
+                x={config.isMobile ? 300 : 775} y={config.isMobile ? 540 : 80} 
                 textAnchor="middle" fill="#94a3b8" fontSize="18" fontWeight="bold">積木區
               </text>
 
