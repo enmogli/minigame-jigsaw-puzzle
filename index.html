@@ -13,16 +13,13 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* 極致行動端最佳化：封印所有原生瀏覽器干擾手勢 */
     body { 
-      overscroll-behavior-y: none; /* 禁用下拉重整與橡皮筋效應 */
-      touch-action: none;          /* 禁用雙指縮放與平移 */
-      -webkit-user-select: none;   /* 禁用 iOS 長按文字選取 */
+      overscroll-behavior-y: none; 
+      touch-action: none;          
+      -webkit-user-select: none;   
       user-select: none;
     }
-    * {
-      -webkit-tap-highlight-color: transparent; /* 禁用 iOS 點擊按鈕時的灰色閃爍 */
-    }
+    * { -webkit-tap-highlight-color: transparent; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
@@ -123,7 +120,7 @@
       playNote(523.25, now + 0.3, 1.5); 
     };
 
-    // --- 預設官方圖庫 (包含玩家創作的關卡) ---
+    // --- 圖庫定義 ---
     const PUZZLES = [
       {
         id: 'square', targets: [
@@ -207,10 +204,11 @@
       }
     ];
 
-    // --- 響應式與沙盒配置引擎 ---
+    // --- 響應式配置引擎 ---
     const getLayoutConfig = (isMobile, puzzleIndex = 0, allPuzzles = PUZZLES, isSandbox = false) => {
       const TARGET_CX = isMobile ? 300 : 280;
-      const TARGET_CY = isMobile ? 240 : 300;
+      // 微調目標高度，為下方積木爭取空間
+      const TARGET_CY = isMobile ? 220 : 300; 
       
       const baseTargets = isSandbox ? [] : allPuzzles[puzzleIndex]?.targets || [];
 
@@ -236,15 +234,15 @@
       }
       const targetBounds = { boxMinX, boxMaxX, boxMinY, boxMaxY };
 
-      // 核心修正 2：行動端出生點 (Y軸向上提昇，使其更為緊湊，遠離底部邊界)
+      // 核心修正：將手機版積木群集體往上提昇，確保完全不接觸底部邊緣
       const initialPieces = isMobile ? [
-        { id: '1', type: 'LT', localPoints: getLocalPoints('LT'), color: '#65C1D0', x: 200, y: 540, rot: 45, flipX: 1, isSnapped: false },
-        { id: '2', type: 'LT', localPoints: getLocalPoints('LT'), color: '#BCE28A', x: 400, y: 540, rot: -45, flipX: 1, isSnapped: false },
-        { id: '3', type: 'MT', localPoints: getLocalPoints('MT'), color: '#F9B42A', x: 300, y: 700, rot: 90, flipX: 1, isSnapped: false },
-        { id: '4', type: 'SQ', localPoints: getLocalPoints('SQ'), color: '#A592C4', x: 140, y: 740, rot: 0, flipX: 1, isSnapped: false },
-        { id: '5', type: 'ST', localPoints: getLocalPoints('ST'), color: '#F38AB8', x: 460, y: 740, rot: 135, flipX: 1, isSnapped: false },
-        { id: '6', type: 'ST', localPoints: getLocalPoints('ST'), color: '#F6E927', x: 240, y: 840, rot: 225, flipX: 1, isSnapped: false },
-        { id: '7', type: 'PA', localPoints: getLocalPoints('PA'), color: '#EB3A52', x: 400, y: 840, rot: 0, flipX: 1, isSnapped: false }
+        { id: '1', type: 'LT', localPoints: getLocalPoints('LT'), color: '#65C1D0', x: 180, y: 520, rot: 45, flipX: 1, isSnapped: false },
+        { id: '2', type: 'LT', localPoints: getLocalPoints('LT'), color: '#BCE28A', x: 420, y: 520, rot: -45, flipX: 1, isSnapped: false },
+        { id: '3', type: 'MT', localPoints: getLocalPoints('MT'), color: '#F9B42A', x: 300, y: 650, rot: 90, flipX: 1, isSnapped: false },
+        { id: '4', type: 'SQ', localPoints: getLocalPoints('SQ'), color: '#A592C4', x: 140, y: 700, rot: 0, flipX: 1, isSnapped: false },
+        { id: '5', type: 'ST', localPoints: getLocalPoints('ST'), color: '#F38AB8', x: 460, y: 700, rot: 135, flipX: 1, isSnapped: false },
+        { id: '6', type: 'ST', localPoints: getLocalPoints('ST'), color: '#F6E927', x: 230, y: 820, rot: 225, flipX: 1, isSnapped: false },
+        { id: '7', type: 'PA', localPoints: getLocalPoints('PA'), color: '#EB3A52', x: 380, y: 820, rot: 0, flipX: 1, isSnapped: false }
       ] : [
         { id: '1', type: 'LT', localPoints: getLocalPoints('LT'), color: '#65C1D0', x: 680, y: 180, rot: 45, flipX: 1, isSnapped: false },
         { id: '2', type: 'LT', localPoints: getLocalPoints('LT'), color: '#BCE28A', x: 860, y: 180, rot: -45, flipX: 1, isSnapped: false },
@@ -304,7 +302,7 @@
         };
         checkMobile();
         window.addEventListener('resize', checkMobile);
-        window.addEventListener('orientationchange', checkMobile); // 攔截平板旋轉事件
+        window.addEventListener('orientationchange', checkMobile);
         return () => {
           window.removeEventListener('resize', checkMobile);
           window.removeEventListener('orientationchange', checkMobile);
@@ -330,15 +328,12 @@
         try {
           const targets = JSON.parse(importText);
           if (!Array.isArray(targets) || targets.length !== 7) throw new Error();
-          
           const newPuzzle = { id: 'custom-' + Date.now(), targets: targets };
           const newCustomPuzzles = [...customPuzzles, newPuzzle];
           setCustomPuzzles(newCustomPuzzles);
-          
           const newIdx = PUZZLES.length + newCustomPuzzles.length - 1;
           setPuzzleIndex(newIdx);
           setIsSandbox(false);
-          
           const combinedPuzzles = [...PUZZLES, ...newCustomPuzzles];
           const newConfig = getLayoutConfig(isMobile, newIdx, combinedPuzzles, false);
           setConfig(newConfig);
@@ -346,8 +341,6 @@
           setIsWin(false);
           setSelectedId(null);
           setIsImporting(false);
-          
-          alert("✅ 成功載入自定義關卡！");
         } catch (err) {
           alert("❌ 代碼無效或格式錯誤，請確保貼上完整的代碼。");
         }
@@ -439,4 +432,12 @@
 
         const pos = getPointerPos(e);
         const piece = pieces.find((p) => p.id === id);
-        if (!piece) ret
+        if (!piece) return;
+
+        dragInfo.current = {
+          isDragging: true, id: id,
+          offsetX: piece.x - pos.x, offsetY: piece.y - pos.y
+        };
+
+        setPieces((prev) => {
+          const filtered = pre
